@@ -131,7 +131,7 @@ npm run build        # Vite 构建，产物输出到 ui/
 npm run validate     # 官方静态校验
 ```
 
-- **Hana App SDK 不在 npm 上，但克隆后无需手工准备。** `@hana/app-sdk` 与 `@hana/plugin-sdk` 由 HanaAgent 发行版以 `.tgz` 携带（`<HANA_HOME>/skills/hana-app-creator/assets/sdk/`）。`package.json` 用 `file:./sdk/…` 引用它们，而 `sdk/` 不入库；`npm install` 会先跑 `preinstall`（`fetch-hana-sdk.mjs`）把这两个文件从**你本机的 HanaAgent** 取到 `sdk/`。所以前提只有一个：装了 HanaAgent。HanaAgent 装在非常规位置时用 `HANA_HOME=/path/to/.hanako npm install`，或手动执行 `npm run sdk:fetch`。
+- `@hana/app-sdk` 与 `@hana/plugin-sdk` 由 HanaAgent 发行版以 `.tgz` 携带（`<HANA_HOME>/skills/hana-app-creator/assets/sdk/`）。`package.json` 用 `file:./sdk/…` 引用它们，而 `sdk/` 不入库；`npm install` 会先跑 `preinstall`（`fetch-hana-sdk.mjs`）把这两个文件从**你本机的 HanaAgent** 取到 `sdk/`。所以前提只有一个：装了 HanaAgent。HanaAgent 装在非常规位置时用 `HANA_HOME=/path/to/.hanako npm install`，或手动执行 `npm run sdk:fetch`。
 - 构建产物必须落在 `ui/`，宿主从 `/api/apps/hana-excalidraw/ui` 这个静态基址加载资源。
 - `node_modules/` **必须随打包产物携带**：安装时宿主不会跑 `npm install`（所以它不进版本库，但会进 zip）。
 - 入口 html（`board.html` / `preview.html` / `sidebar.html` / `standalone.html`）必须放在**插件根目录**，不能进子目录，否则构建产物的相对路径会让 manifest 里的 `route` 指空。

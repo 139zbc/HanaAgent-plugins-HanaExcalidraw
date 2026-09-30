@@ -111,8 +111,7 @@ board_draw_mermaid  →  board_check（便宜：结构对不对）  →  board_r
 
 ### 方式 A：装打包好的包（普通用户）
 
-当前版本：<https://github.com/139zbc/HanaAgent-plugins-HanaExcalidraw/releases/tag/v1.0.0>（发布前请把版本号与链接同步到最新 tag）
-
+<https://github.com/139zbc/HanaAgent-plugins-HanaExcalidraw/releases>
 ```
 app-hana-excalidraw-1.0.0.zip        111,548,541 字节
 app-hana-excalidraw-1.0.0.entry.json 宿主安装用的扩展索引条目
@@ -280,7 +279,7 @@ Agent 用的就是下面这些工具。先读：
 
 - **离线可用。** 卡片页面没有外网权限，字体（9 个族、234 个子集文件）与其他静态资源全部自托管，运行时不请求外部 CDN。
 - **`node_modules` 随包携带**，安装时不执行 `npm install`。
-- **包体积在 100 MB 量级**，大头是 `node_modules` 和自托管字体
+- **包体积在 100 MB 量级**，大头是 `node_modules` 和自托管字体。
 
 ---
 

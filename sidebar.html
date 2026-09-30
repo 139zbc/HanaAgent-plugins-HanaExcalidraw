@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>白板</title>
+    <style>
+      /* Inline and first, because it is the only thing that must work when
+         nothing else does. This document is a 200px column with no room for a
+         boot screen, so the failure state is one line of text and the console. */
+      html, body { height: 100%; margin: 0; }
+      body {
+        font: 13px/1.6 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+        color: #3b3d3f;
+        /* Literal floor, matching the host's warm-paper --sidebar-bg. The themed
+           value arrives with sidebar.css; this is only here so the panel is not
+           white for the frame between first paint and the stylesheet. */
+        background: #f4f0ea;
+      }
+      #sidebar { height: 100%; }
+      .boot {
+        display: flex; align-items: center; justify-content: center;
+        height: 100%; padding: 16px; text-align: center;
+        font-size: 12px; color: #8e9196;
+      }
+    </style>
+  </head>
+  <body data-view="board-sidebar">
+    <div id="sidebar">
+      <div class="boot">侧栏正在启动…</div>
+    </div>
+    <script>
+      /* The panel is a separate document from the card, so nothing here can see
+         the card's boot diagnostics. All it gets is a console and this object;
+         the reason is recorded in the same place, in case a blank panel is ever
+         reported as "the feature stopped working". */
+      (function () {
+        var diag = { inline: true, module: false, csp: [], errors: [] };
+        document.addEventListener("securitypolicyviolation", function (e) {
+          diag.csp.push((e.violatedDirective || "?") + " :: " + (e.blockedURI || e.sourceFile || "?"));
+        });
+        window.addEventListener("error", function (e) {
+          diag.errors.push(
+            String((e && (e.message || e.type)) || "unknown") +
+            (e && e.filename ? " @ " + e.filename : "") +
+            (e && e.lineno ? ":" + e.lineno : "")
+          );
+        });
+        window.addEventListener("unhandledrejection", function (e) {
+          var r = e && e.reason;
+          diag.errors.push("rejection: " + (r && (r.message || r) || r));
+        });
+        window.__boardDiag = diag;
+        setTimeout(function () {
+          if (window.__boardDiag) {
+            console.info(
+              "[excalidraw] sidebar diagnostics:",
+              "mounted=" + (diag.module ? "yes" : "no"),
+              "errors=" + (diag.errors.length ? diag.errors.join(" | ") : "(none)"),
+              "csp=" + (diag.csp.length ? diag.csp.join(" | ") : "(none)")
+            );
+          }
+        }, 1200);
+      })();
+    </script>
+    <script type="module">
+      // Report before the module graph is even requested, so "the module never
+      // ran" and "the module ran and threw" are distinguishable.
+      if (window.__boardDiag) window.__boardDiag.moduleRequested = true;
+    </script>
+    <script type="module" src="/src/sidebar.jsx"></script>
+  </body>
+</html>

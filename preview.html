@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>白板预览</title>
+    <script>
+      window.EXCALIDRAW_ASSET_PATH = new URL("./assets/fonts/", document.baseURI).href;
+    </script>
+    <style>
+      html, body { height: 100%; margin: 0; }
+      body { font: 13px/1.7 system-ui, -apple-system, "Segoe UI", sans-serif; color: #334155; background: #fbfbfd; }
+      .boot { display: flex; flex-direction: column; gap: 10px; align-items: center;
+              justify-content: center; height: 100%; text-align: center; padding: 24px; }
+      .boot-title { font-size: 15px; color: #1e293b; }
+      .boot-hint { font-size: 12px; color: #94a3b8; max-width: 44em; }
+      .boot-hint.err { color: #b91c1c; }
+      .boot-diag { margin: 0; max-width: 60em; width: 100%; text-align: left; white-space: pre-wrap;
+                   word-break: break-all; font: 11px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace;
+                   color: #475569; background: #f1f5f9; border-radius: 8px; padding: 10px 12px; }
+    </style>
+  </head>
+  <body data-view="preview">
+    <div id="root">
+      <div class="boot">
+        <div class="boot-title">白板预览正在启动…</div>
+        <div class="boot-hint" id="boot-hint">如果一直停在这里，说明脚本没有跑起来。</div>
+        <pre class="boot-diag" id="boot-diag"></pre>
+      </div>
+    </div>
+    <script>
+      /* Same self-diagnosis as board.html and standalone.html: a card that renders
+         nothing carries no evidence, and a silently refused module script never
+         fires window.onerror. */
+      (function () {
+        var hintEl = document.getElementById("boot-hint");
+        var diagEl = document.getElementById("boot-diag");
+        var diag = { inline: true, module: false, csp: [], errors: [], resources: [] };
+
+        document.addEventListener("securitypolicyviolation", function (e) {
+          diag.csp.push((e.violatedDirective || "?") + " :: " + (e.blockedURI || e.sourceFile || "?"));
+        });
+        window.addEventListener("error", function (e) {
+          diag.errors.push(
+            String((e && (e.message || e.type)) || "unknown") +
+            (e && e.filename ? " @ " + e.filename : "") +
+            (e && e.lineno ? ":" + e.lineno : "")
+          );
+        }, true);
+        window.addEventListener("unhandledrejection", function (e) {
+          var r = e && e.reason;
+          diag.errors.push("rejection: " + (r && (r.message || r) || r));
+        });
+
+        function render() {
+          if (!diagEl) return;
+          try {
+            diag.resources = performance.getEntriesByType("resource").map(function (r) {
+              return r.name.split("/").pop() + "=" + r.responseStatus;
+            });
+          } catch (err) { diag.resources = ["<unreadable>"]; }
+          var root = document.getElementById("root");
+          diagEl.textContent =
+            "inline=" + diag.inline +
+            " module=" + diag.module +
+            " bootStillThere=" + (root && root.querySelector(".boot") ? "yes" : "no") +
+            "\nerrors=" + (diag.errors.length ? diag.errors.join(" | ") : "(none)") +
+            "\ncsp=" + (diag.csp.length ? diag.csp.join(" | ") : "(none)") +
+            "\nresources=" + (diag.resources.length ? diag.resources.join(" ") : "(none)");
+          if (diag.errors.length && hintEl) {
+            hintEl.className = "boot-hint err";
+            hintEl.textContent = "脚本报错，详情见下方。";
+          }
+        }
+
+        window.__boardDiag = diag;
+        render();
+        setTimeout(render, 1500);
+        setTimeout(render, 4000);
+      })();
+    </script>
+    <script type="module" src="/src/preview.jsx"></script>
+  </body>
+</html>

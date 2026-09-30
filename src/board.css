@@ -1,0 +1,213 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  /* Matches Excalidraw's own light canvas, so the frame before the theme lands
+     is already the colour the canvas is about to become. The dark value is
+     applied by the `[data-theme="dark"]` rule further down. */
+  background: #ffffff;
+}
+
+/* The shell is `position: fixed; inset: 0`, so giving it the theme's canvas
+ * colour covers the whole viewport and hides the white page behind it. The gap
+ * matters: Excalidraw paints its own canvas, but the sliver between the canvas
+ * and the viewport edge, and any moment before it mounts, would otherwise show
+ * through as white. */
+.board-shell[data-theme="dark"] {
+  background: #1e1e1e;
+}
+
+.board-shell {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+
+}
+
+/* Excalidraw declares its own defaults on `.excalidraw`, so these must be set
+   on that node rather than only inherited from the shell. */
+.board-shell .excalidraw {
+  /* Map control feedback to Hana; drawing swatches stay untouched. */
+  --color-primary: var(--accent, #6965db);
+  --color-primary-darker: var(--accent-dark, var(--accent, #5b57d1));
+  --color-primary-darkest: var(--accent-dark, var(--accent, #4a47b1));
+  --color-primary-light: var(--accent-light, color-mix(in srgb, var(--accent, #6965db) 16%, transparent));
+  --color-primary-light-darker: var(--accent-light, color-mix(in srgb, var(--accent, #6965db) 22%, transparent));
+  --color-primary-hover: var(--accent-dark, var(--accent, #5753d0));
+  --color-brand-hover: var(--accent-dark, var(--accent, #5753d0));
+  --color-brand-active: var(--accent-dark, var(--accent, #4440bf));
+  --button-active-bg: var(--accent, #6965db);
+  --button-active-border: var(--accent-dark, var(--accent, #4a47b1));
+  --button-hover-bg: var(--accent-light, color-mix(in srgb, var(--accent, #6965db) 14%, transparent));
+  --button-hover-color: var(--accent, #6965db);
+  --button-hover-border: var(--accent, #6965db);
+  --color-surface-primary-container: var(--accent-light, color-mix(in srgb, var(--accent, #6965db) 14%, transparent));
+  --color-on-primary-container: var(--text, #1b1b1f);
+  --color-border-outline: var(--border, var(--accent, #6965db));
+  --color-border-outline-variant: var(--border-muted, var(--border, #c5c5d0));
+  --focus-highlight-color: var(--accent, #6965db);
+}
+
+/* Appears when another writer (the agent) changed the board under us. */
+.board-banner {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.86);
+  color: #f8fafc;
+  font: 12px/1.5 var(--font-ui, system-ui, sans-serif);
+  pointer-events: none;
+  animation: board-banner-in 180ms ease-out;
+}
+
+.board-banner--warn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+  background: rgba(180, 83, 9, 0.95);
+}
+
+.board-banner__btn {
+  padding: 3px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font: 11px/1.6 inherit;
+  cursor: pointer;
+}
+
+.board-banner__btn:hover { background: rgba(255, 255, 255, 0.18); }
+
+/* Read-only preview: strip Excalidraw's editor chrome.
+ *
+ * The host puts a full editor toolbar in this narrow column, and every control in
+ * it is an editing affordance — shape tools, the library, lock, the main menu.
+ * In a card whose whole purpose is "here is what the agent drew", they are wrong
+ * affordances: nothing to draw with, and no way to save a change if they tried.
+ *
+ * Matched off `.board-shell[data-preview]`, set by the component, rather than a
+ * body class, so a page can host more than one board without them fighting over
+ * the document. */
+.board-shell[data-preview="true"] .App-menu,
+.board-shell[data-preview="true"] .App-menu_top,
+.board-shell[data-preview="true"] .App-menu_bottom,
+.board-shell[data-preview="true"] .FixedSideContainer,
+.board-shell[data-preview="true"] .FixedSideContainer_side_top,
+.board-shell[data-preview="true"] .App-top-bar,
+.board-shell[data-preview="true"] .App-toolbar,
+.board-shell[data-preview="true"] .App-toolbar-container,
+.board-shell[data-preview="true"] .mobile-misc-tools-container,
+.board-shell[data-preview="true"] .dropdown-menu-button,
+.board-shell[data-preview="true"] .sidebar-trigger,
+.board-shell[data-preview="true"] .layer-ui__wrapper__top-right,
+.board-shell[data-preview="true"] .HintViewer {
+  display: none !important;
+}
+
+/* The canvas fills the card rather than sitting under the host's floating
+ * titlebar, which is the one thing the preview must not lose. */
+.board-shell[data-preview="true"] .excalidraw-container {
+  position: absolute;
+  inset: 0;
+}
+
+/* Zoom cluster, bottom-right.
+ * Excalidraw's own is hidden and this replaces it: the host hands the card a
+ * surface credential, and the readout has to be live rather than a number the
+ * page only knows about. The dark-mode block below is not a preference — the
+ * card follows the system, and a white pill on a dark canvas is unreadable. */
+.board-zoom {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--board-line, #e2e8f0);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(6px);
+  font: 12px/1.4 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  color: #334155;
+}
+
+.board-zoom__btn,
+.board-zoom__value {
+  min-width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.board-zoom__btn:hover:not(:disabled),
+.board-zoom__value:hover:not(:disabled) { background: #eff6ff; }
+
+.board-zoom__btn:disabled,
+.board-zoom__value:disabled { opacity: 0.4; cursor: default; }
+
+.board-zoom__value {
+  min-width: 46px;
+  font-variant-numeric: tabular-nums;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.board-zoom__btn--wide { padding: 0 8px; min-width: 0; }
+
+.board-zoom__divider {
+  width: 1px;
+  height: 16px;
+  background: var(--board-line, #e2e8f0);
+  margin: 0 2px;
+}
+
+/* The card's own controls follow the **app's** theme, not the system's.
+ *
+ * This was `@media (prefers-color-scheme: dark)`, which is a different question.
+ * A user can be in a light app on a dark OS, and then the zoom cluster was a
+ * white pill on a dark canvas while Excalidraw's own chrome followed the app.
+ * Keyed off `data-theme` on the shell, which the component sets from the host's
+ * `appearance` — so the cluster and the canvas agree by construction instead of
+ * by coincidence, and switching either one switches both. */
+.board-shell[data-theme="dark"] .board-zoom {
+  background: rgba(30, 30, 34, 0.94);
+  border-color: #3f3f46;
+  color: #e2e8f0;
+}
+
+.board-shell[data-theme="dark"] .board-zoom__value { color: #f1f5f9; }
+
+.board-shell[data-theme="dark"] .board-zoom__btn:hover:not(:disabled),
+.board-shell[data-theme="dark"] .board-zoom__value:hover:not(:disabled) { background: #334155; }
+
+.board-shell[data-theme="dark"] .board-zoom__divider { background: #3f3f46; }
+
+@keyframes board-banner-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}

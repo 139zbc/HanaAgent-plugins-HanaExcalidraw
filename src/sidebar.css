@@ -1,0 +1,600 @@
+/*
+ * The Function Panel, self-built.
+ * ================================
+ *
+ * This file is a deliberate transcription of the host's own panel stylesheet.
+ * Every rule under "host primitives" below is the host's rule, read out of the
+ * installed renderer's stylesheet (`contributed-keybindings-*.css`, classes
+ * `_panel_*` / `_row_*` / `_pill_*` / `_action_*`), with the hashed class names
+ * replaced by readable ones and the values left alone. The buttons are the same
+ * deal, from `Button-*.css`: `.bp-action` is `_variant-secondary`, values
+ * intact, including the `--control-*` slots it reads — all unset here, which is
+ * also true of the host wherever the component takes its defaults, so the
+ * fallbacks are what actually renders.
+ *
+ * Why transcribe instead of reuse: the panel primitives and the panel document
+ * are mutually exclusive. Declaring `functionPanel.route` makes the host render
+ * an iframe *instead of* calling `hana.panel.set`, so there is no way to have
+ * the host draw the list and also have a right-click menu on it. The choice is
+ * between losing the two capabilities the vocabulary cannot express, and
+ * shipping a look-alike. Copying the rules verbatim is what makes the second
+ * option cost nothing visually: the panel is supposed to be indistinguishable
+ * from the host's, and the fastest way to be sure is to use the same numbers.
+ *
+ * What did NOT survive the move, and is re-declared in theme-fallback.css
+ * because the host's own sheet defined them: the spacing scale, the two font
+ * sizes, the serif stack, the transition tokens, the radius scale, and
+ * `--border-muted`. Those live in the host theme, which arrives per-theme; the
+ * fallbacks are the light-theme values, and a real theme overwrites them.
+ *
+ * The rules under "beyond the vocabulary" are the reason this document exists:
+ * a context menu on a row, and a text field. Neither has a host equivalent to
+ * copy, so they are new — and they borrow the primitive's own tokens (same
+ * border, same radius, same text colours) so they do not read as a foreign
+ * object sitting inside host chrome.
+ */
+
+/*
+ * The panel's own background.
+ *
+ * The iframe is transparent, so whatever the host's panel pane paints shows
+ * through — and that pane is white, not the left rail's paper. Setting the body
+ * to the rail's own fill is the same chain the installed dshana sidebar uses, and
+ * it is the only thing that makes the panel read as part of the same column as
+ * the 新会话 / 工作区 lists directly above it.
+ *
+ * `--sidebar-bg` is the rail's variable specifically; `--bg` is the app canvas
+ * and is a shade lighter, so using it here would leave a visible seam down the
+ * middle of one continuous sidebar.
+ */
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--sidebar-bg, #f4f0ea);
+}
+
+.bp-panel {
+  /* One left edge for the whole panel. Every block below indents to this, so
+   * 「画板」, a board title and 导出 PNG all start on the same line. Before it
+   * the three of them sat at 8px / 12px / 8px and the column read as three
+   * unrelated columns stacked on top of each other. */
+  --bp-gutter: var(--space-12);
+
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* 4px was enough to keep a divider out of the list and not enough to read as
+   * two sections. 8px is the smallest gap that still separates blocks at this
+   * type size without making the short panel scroll sooner than it has to. */
+  gap: var(--space-8);
+  padding: var(--space-10) 0;
+  overflow-y: auto;
+}
+
+/*
+ * From here down the panel follows the **app's left rail**, not the host's
+ * function-panel primitives.
+ *
+ * The two are different visual languages and the difference is not subtle. The
+ * host highlights a row flush to the column edges with square corners
+ * (`padding: var(--space-6) var(--space-12)`, no radius, no side margin). The
+ * left rail insets every row, rounds it, and gives the selected one a soft
+ * accent pill. Same tokens underneath — both read `--accent-light`,
+ * `--border`, `--text-muted` — different geometry.
+ *
+ * Chosen deliberately, and it is a departure: the panel stops looking like
+ * "the host's function panel" and starts looking like the navigation the user
+ * already has in their left hand every time they open the app. For a list of
+ * files that is the more useful resemblance, and the panel is a list of files.
+ *
+ * What carried over unchanged, because it was never a panel decision: the
+ * vocabulary (title / subtitle / meta / badge), the spacing scale, the two font
+ * sizes, and every colour — all read from the host, not chosen here.
+ */
+.bp-groupTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+  padding: var(--space-6) var(--bp-gutter) var(--space-4);
+  font-family: var(--font-serif);
+  font-size: var(--fs-caption);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.bp-groupTools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-right: calc(-1 * var(--space-4));
+}
+
+.bp-groupHint {
+  font-size: var(--fs-caption);
+  color: var(--text-light);
+}
+
+/* Section-header icon button. The left rail puts its section's actions here
+ * rather than in a row of text buttons at the bottom, and that is the better
+ * place for them: 「画板」 is what the button acts on, and a 「+」 three rows
+ * below it is a button that has to be read as belonging to something. */
+.bp-iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  padding: 0;
+  border: none;
+  /* --radius-sm, same as the host's small controls. 5px was a value nothing
+   * else in the system used. */
+  border-radius: calc(var(--radius-sm, 6px) * var(--corner-radius-scale, 1));
+  corner-shape: squircle;
+  background: none;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+.bp-iconBtn:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--overlay-subtle);
+}
+
+.bp-iconBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.bp-iconBtn:disabled {
+  color: var(--text-light);
+  opacity: 0.45;
+  cursor: default;
+}
+
+.bp-status {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--bp-gutter);
+  font-size: var(--fs-ui);
+}
+
+.bp-statusLabel {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bp-statusValue {
+  flex: none;
+  max-width: 62%;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bp-statusDelta {
+  flex: none;
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.bp-statusDelta[data-tone="success"] { color: var(--success); }
+.bp-statusDelta[data-tone="warning"] { color: var(--warning); }
+.bp-statusDelta[data-tone="danger"] { color: var(--danger); }
+.bp-statusDelta[data-tone="info"] { color: var(--accent); }
+
+.bp-list {
+  display: flex;
+  flex-direction: column;
+  /* The one addition to the host's rule. The insertion line is an absolutely
+   * positioned child and needs something to anchor to; without a positioned
+   * ancestor it measures against the viewport and lands somewhere else
+   * entirely. It changes nothing about how the host's own rules lay out. */
+  position: relative;
+  /* Side inset so the selected pill does not touch the column edge. Every row
+   * gets it, not just the selected one: a highlight that appears by insetting
+   * its own margins shifts the text sideways on selection, which reads as a jump
+   * rather than as a selection. */
+  padding: 0 var(--space-4);
+}
+
+.bp-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  width: 100%;
+  /* 8px on all four sides. The 6px vertical was measured against a single line
+   * of text; with a title and a revision under it the pair had 6px of air above
+   * and 6px below, which read as one block glued to its neighbours. 8px also
+   * makes the row a 44px pointer target — the difference between clicking a
+   * board and missing it. */
+  padding: var(--space-8);
+  border: none;
+  border-radius: calc(9px * var(--corner-radius-scale, 1));
+  corner-shape: squircle;
+  background: none;
+  text-align: left;
+  font-size: var(--fs-ui);
+  /* The default 1.2 set a Chinese title and a Latin revision nearly on top of
+   * each other. */
+  line-height: 1.45;
+  color: var(--text);
+  cursor: pointer;
+  /* The whole row is the drag surface on a mouse, so a press-and-move would
+     otherwise smear a text selection across the title before the 5px threshold
+     decides it was a drag. Rows are not text, and nothing here is selectable. */
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.bp-row:hover:not(:disabled) { background: var(--overlay-subtle); }
+.bp-row:disabled { color: var(--text-light); cursor: default; }
+.bp-row[data-selected] { background: var(--accent-light); }
+.bp-row[data-selected]:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+}
+
+.bp-rowBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  /* 2px between the title and its revision. Zero was a decision made when the
+   * subtitle was a shape breakdown and the two lines were long enough to be
+   * told apart by their own width; here the subtitle is 「r349」, and the
+   * pairing needs the gap to read as a pair. */
+  gap: var(--space-2);
+}
+
+.bp-rowTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.bp-rowSubtitle {
+  font-size: var(--fs-caption);
+  line-height: 1.3;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bp-rowTrailing {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.bp-rowMeta {
+  font-size: var(--fs-caption);
+  color: var(--text-light);
+  font-variant-numeric: tabular-nums;
+}
+
+.bp-badge {
+  min-width: 16px;
+  padding: 0 var(--space-4);
+  border-radius: calc(2px * var(--corner-radius-scale, 1));
+  corner-shape: squircle;
+  background: var(--border-muted);
+  font-size: var(--fs-caption);
+  line-height: 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.bp-badge[data-kind="ai"] {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+
+.bp-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--bp-gutter);
+}
+
+.bp-pill {
+  padding: var(--space-2) var(--space-8);
+  border: 1px solid var(--border);
+  border-radius: calc(2px * var(--corner-radius-scale, 1));
+  corner-shape: squircle;
+  background: none;
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.bp-pill:hover:not(:disabled) { color: var(--text); }
+.bp-pill[data-selected] { border-color: var(--accent); color: var(--accent); }
+.bp-pill:disabled { color: var(--text-light); cursor: default; }
+
+.bp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  padding: var(--space-4) var(--bp-gutter) var(--space-10);
+}
+
+/*
+ * The host's Button, variant=secondary, size=sm.
+ *
+ * Transcribed from `Button-*.css` with the values intact, the `--control-*`
+ * slots included. A quiet filled button is the right weight here: the outlined
+ * chip this replaces had a 2px radius, no fill, and a hover that turned the
+ * border and the label accent blue — in a column of two, the least important
+ * control on the panel was the loudest thing in it. Secondary keeps accent for
+ * the one thing that is actually current.
+ */
+.bp-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+  min-height: var(--control-height, auto);
+  padding: var(--control-block-padding, 0.3rem) var(--control-inline-padding, 0.8rem);
+  border: 1px solid transparent;
+  border-radius: calc(var(--control-radius, var(--radius-card, 10px)) * var(--corner-radius-scale, 1));
+  corner-shape: squircle;
+  background: var(--overlay-subtle);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--control-font-size, var(--fs-caption));
+  line-height: var(--control-line-height, 1);
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    opacity var(--duration-fast) var(--ease-standard),
+    transform var(--button-motion-duration, 0.22s) var(--button-motion-easing, cubic-bezier(0.16, 1, 0.3, 1));
+}
+
+.bp-action:hover:not(:disabled) {
+  background: var(--overlay-medium, var(--overlay-light));
+}
+
+.bp-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.bp-action:active:not(:disabled) {
+  --button-motion-duration: 0.1s;
+  --button-motion-easing: cubic-bezier(0.2, 0, 0.4, 1);
+  transform: translateY(1px) scale(0.985);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bp-action:active:not(:disabled) { transform: none; }
+}
+
+.bp-action:disabled { opacity: 0.5; cursor: default; }
+
+/* Danger, for the panel's own destructive row. The host's danger variant is a
+ * solid fill keyed on `--danger-bg`, which this document's fallback does not
+ * carry; a tint of --danger says the same thing without inventing a token. */
+.bp-action[data-tone="danger"] {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+}
+
+.bp-action[data-tone="danger"]:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 20%, transparent);
+}
+
+.bp-text {
+  padding: var(--space-8) var(--bp-gutter);
+  font-family: var(--font-serif);
+  font-size: var(--fs-ui);
+  color: var(--text-muted);
+}
+
+.bp-text[data-tone="danger"] { color: var(--danger); }
+
+/* ---- beyond the vocabulary ------------------------------------------- */
+
+/*
+ * The row, as a target for a context menu.
+ *
+ * A host row is a `<button>`; a button can take a context menu perfectly well,
+ * and this one still is one — the change is that the right-click handler is
+ * here to be attached, which is the whole point. Kept as a button so keyboard
+ * activation, focus ring and the disabled semantics are the browser's, not a
+ * reimplementation of them.
+ */
+.bp-row[data-menu-open] {
+  background: var(--overlay-medium);
+}
+
+/* The context menu itself. Fixed-position so it escapes the panel's own
+ * `overflow-y: auto`, which would otherwise clip it to the list. */
+.bp-menu {
+  position: fixed;
+  z-index: 40;
+  min-width: 148px;
+  max-width: 240px;
+  padding: var(--space-4) 0;
+  border: 1px solid var(--border);
+  border-radius: calc(6px * var(--corner-radius-scale, 1));
+  background: var(--bg-card, var(--bg));
+  box-shadow: 0 6px 24px var(--shadow);
+}
+
+.bp-menuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  width: 100%;
+  padding: var(--space-6) var(--space-12);
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: var(--fs-ui);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.bp-menuItem:hover:not(:disabled),
+.bp-menuItem:focus-visible {
+  background: var(--overlay-subtle);
+  outline: none;
+}
+
+.bp-menuItem:disabled { color: var(--text-light); cursor: default; }
+.bp-menuItem[data-tone="danger"] { color: var(--danger); }
+.bp-menuItem[data-tone="danger"]:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 8%, transparent); }
+.bp-menuItem[data-tone="danger"]:disabled { color: var(--text-light); }
+
+.bp-menuDivider {
+  height: 1px;
+  margin: var(--space-4) 0;
+  background: var(--border);
+}
+
+.bp-menuHeading {
+  padding: var(--space-6) var(--space-12) var(--space-4);
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+  white-space: normal;
+}
+
+/*
+ * The composer: the text field the vocabulary has no word for.
+ *
+ * Sits above the footer, and only exists while something is being named. It is
+ * pinned rather than appended so it never moves the buttons out from under the
+ * pointer that opened it.
+ */
+.bp-composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin: var(--space-4) var(--space-4) 0;
+  padding: var(--space-10);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-sm, 6px) * var(--corner-radius-scale, 1));
+  corner-shape: squircle;
+  background: var(--overlay-subtle);
+}
+
+.bp-composerLabel {
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+}
+
+.bp-composerRow {
+  display: flex;
+  gap: var(--space-6);
+}
+
+.bp-input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-6) var(--space-8);
+  border: 1px solid var(--border);
+  /* The host's field radius: --radius-input + 2px. A 2px field next to a 10px
+   * button is the mismatch you notice without being able to name. */
+  border-radius: calc((var(--radius-input, 4px) + 2px) * var(--corner-radius-scale, 1));
+  corner-shape: squircle;
+  background: var(--bg-card, var(--bg));
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-ui);
+}
+
+.bp-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.bp-input::placeholder { color: var(--text-light); }
+
+/* The error line under a failed file operation. Sits in the panel rather than
+ * in a toast: the panel is already open, and a message that appears somewhere
+ * else is a message that gets missed. */
+.bp-error {
+  padding: 0 var(--bp-gutter) var(--space-4);
+  font-size: var(--fs-caption);
+  color: var(--danger);
+}
+
+/* ---- drag to reorder ------------------------------------------------- */
+/*
+ * The dragged row does not follow the pointer. A line does.
+ *
+ * This panel is about 245px wide and it scrolls. A dragged row in a narrow
+ * scrolling column is the worst case for that idiom: the row is wider than the
+ * space it needs to move through, it obscures the very rows being dropped
+ * between, and once the list is longer than the viewport the subject scrolls
+ * out from under the pointer mid-gesture. A 2px line says the only thing that
+ * matters — where it will land — and it stays legible at 245px.
+ */
+.bp-list[data-dragging] .bp-row {
+  /* The row being moved stays where it is, visibly inert. It is not lifted: the
+   * list must not reflow while the user is aiming, or the targets move too. */
+  cursor: grabbing;
+}
+
+.bp-list[data-dragging] .bp-row[data-dragged] {
+  opacity: 0.45;
+}
+
+.bp-dropLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  margin-top: -1px;
+  background: var(--accent);
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.bp-dropLine::before {
+  /* A dot at the line's leading end, so the insertion point is legible even at
+   * one pixel of contrast against a selected row behind it. */
+  content: "";
+  position: absolute;
+  left: 0;
+  top: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* The grab affordance is gone, and with it the whole idea of a 10px handle. It
+ * existed so touch would have *some* drag target, and it was a dead strip that
+ * did nothing visible: a finger either never found it or hit it and got silence.
+ * Touch now long-presses the row instead, which is the gesture every phone file
+ * manager already uses, and whose side effect — the insertion line appearing —
+ * is its own feedback. */
+/* While a drag is live the list must not scroll under a stationary finger or
+ * a still mouse: the pointer selects a slot, and anything that moves the rows
+ * under it invalidates that choice. Auto-scroll below is the one deliberate
+ * exception, and it is driven by the pointer leaving the row band. */
+.bp-list[data-dragging] {
+  user-select: none;
+  -webkit-user-select: none;
+}
+

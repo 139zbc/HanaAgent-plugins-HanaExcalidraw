@@ -1,0 +1,26 @@
+{
+  "name": "excalidraw-board",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "把 Excalidraw 嵌进 HanaAgent 的白板：用户直接画，Agent 也能创建和编辑。",
+  "scripts": {
+    "preinstall": "node fetch-hana-sdk.mjs",
+    "sdk:fetch": "node fetch-hana-sdk.mjs",
+    "build": "vite build",
+    "dev": "vite",
+    "validate": "node \"%HANA_APP_TOOLS_ROOT%\\scripts\\validate-app.mjs\" --dir . --json",
+    "smoke": "node \"%HANA_APP_TOOLS_ROOT%\\scripts\\validate-app.mjs\" --dir . --smoke --json"
+  },
+  "dependencies": {
+    "@excalidraw/excalidraw": "0.18.1",
+    "@hana/app-sdk": "file:./sdk/hana-app-sdk.tgz",
+    "@hana/plugin-sdk": "file:./sdk/hana-plugin-sdk-0.0.0.tgz",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "vite": "^7.0.0"
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "manifestVersion": 2,
+  "id": "hana-excalidraw",
+  "name": "白板",
+  "version": "1.0.0",
+  "description": "把 Excalidraw 嵌进 HanaAgent：你在画板上直接画，Agent 也能创建和编辑同一块画板。",
+  "entry": "index.js",
+  "icon": "assets/icon.png",
+  "minAppVersion": "0.1028.0",
+  "capabilities": [
+    "app/tools.expose-to-model",
+    "app/resources.write"
+  ],
+  "contributes": {
+    "cards": [
+      {
+        "id": "board",
+        "title": "白板",
+        "description": "一块可手绘的画布。你可以直接在板上画，Agent 也能按对话内容创建和修改图元，两边实时同步。",
+        "route": "/board.html",
+        "realization": "page",
+        "siteNavEntry": true,
+        "fpFullPanel": true,
+        "functionPanel": {
+          "id": "board-panel",
+          "label": "白板",
+          "route": "/sidebar.html"
+        },
+        "cardForm": "structural",
+        "titleMode": "show",
+        "detached": {
+          "route": "/standalone.html"
+        },
+        "detachedDefaultSize": {
+          "width": 1440,
+          "height": 900
+        },
+        "face": {
+          "image": "assets/cover.png"
+        }
+      },
+      {
+        "id": "board-preview",
+        "title": "白板预览",
+        "description": "对话里的一张只读白板卡，由 board_share 通过工具返回值 details.card 声明，不可编辑。",
+        "route": "/preview.html",
+        "cardForm": "structural",
+        "titleMode": "show",
+        "face": {
+          "image": "assets/cover.png"
+        }
+      }
+    ]
+  }
+}

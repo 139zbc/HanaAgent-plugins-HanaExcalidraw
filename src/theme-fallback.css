@@ -1,0 +1,117 @@
+/*
+ * Host theme variables, in two layers, because they arrive by two different
+ * routes.
+ *
+ * A card and a Function Panel are separate iframes. They do not inherit the
+ * main window's variables, and the host does not push them in either — it
+ * injects one stylesheet, the *active theme's*, from `theme.getSnapshot()`'s
+ * `cssUrl`. That sheet carries colours. It does not carry the scale.
+ *
+ * Measured against the installed renderer (0.1050.9):
+ *
+ *   warm-paper-<hash>.css   → --bg, --sidebar-bg, --text*, --border,
+ *                             --accent*, --overlay-*, --shadow, --danger
+ *   mobile-<hash>.css       → --space-*, --radius-*, --fs-*, --font-serif,
+ *                             --duration-fast, --ease-standard,
+ *                             --corner-radius-scale, --border-muted
+ *
+ * The second one is the app's global scale sheet, and it is only ever in the
+ * main window's <head>. So inside the panel there is no scale at all unless
+ * this file supplies one. Hence two layers:
+ *
+ *   Layer 1, `:root`             the scale. Unconditional.
+ *   Layer 2, `:root:not([data-theme])`  the colours. Steps aside for the host.
+ *
+ * Layer 1 is unconditional on purpose. The scale is theme-invariant in the host
+ * too — the host also defines it once on a bare `:root`, never per theme — so
+ * supplying it here is not a fallback for a missing value, it is supplying a
+ * sheet the frame legitimately never gets. A theme that ever did redefine a
+ * scale token would still win: the host injects its <style> at runtime, after
+ * this bundle in the document, and at equal specificity source order decides.
+ *
+ * Layer 2 keeps the `:not([data-theme])` qualifier, and the reason it is there
+ * is unchanged. A bare `:root` and the host's `[data-theme="<id>"]` rules have
+ * the *same* specificity (0,1,0), so which one wins comes down to source order.
+ * The host injects its sheet as a <style> appended to <head> at runtime, i.e.
+ * after this bundle, so it would win anyway — but only by accident of loading
+ * order, and it also has to be true *before* the panel sets `data-theme`
+ * (see `followHostTheme` in sidebar.jsx), or the first paint reads this file's
+ * light colours as if they were the host's. Qualifying it makes the handoff
+ * explicit: set the attribute, this file stands down, the host's values are
+ * live.
+ *
+ * The values are the host light theme's own numbers, and sidebar.jsx injects
+ * the real sheet after this file. Same priority, later in the document — the
+ * real theme wins, and this file is the floor rather than the answer.
+ */
+
+/* ---- layer 1: the scale, always ---------------------------------- */
+:root {
+  /* Transcribed from the host's own global sheet. */
+  --space-2: 0.125rem;
+  --space-4: 0.25rem;
+  --space-6: 0.375rem;
+  --space-8: 0.5rem;
+  --space-10: 0.625rem;
+  --space-12: 0.75rem;
+
+  --fs-ui: 0.82rem;
+  --fs-caption: 0.78rem;
+
+  /* The host's radius scale, so a control transcribed from `Button-*.css`
+   * lands on the same corner the host draws instead of on whatever fallback
+   * the transcription happened to carry. */
+  --radius-input: 4px;
+  --radius-sm: 6px;
+  --radius-card: 10px;
+  --corner-radius-scale: 1;
+
+  --reading-font-family: "PT Serif", "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", serif;
+  --font-serif: var(--reading-font-family);
+  --font-ui: system-ui, -apple-system, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+
+  --duration-fast: 0.15s;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  --border-muted: #e8e4df;
+
+  /* Two semantic colours the host's scale sheet does not carry in this build.
+   * The status line paints `.bp-statusDelta[data-tone="success"]` straight from
+   * them, so leaving them to layer 2 would mean an invalid `color` and an
+   * inherited colour the moment a theme is active. */
+  --success: #5a9e6f;
+  --warning: #a26a15;
+}
+
+/* ---- layer 2: the colours, until the host says otherwise --------- */
+:root:not([data-theme]) {
+  color-scheme: light;
+
+  /* Host light theme. */
+  --bg: #f8f4ed;
+  --bg-card: #fcfaf5;
+  --bg-surface: #fffdf9;
+  --sidebar-bg: #f4f0ea;
+  --bg-input: var(--bg);
+
+  --text: #3b3d3f;
+  --text-light: #6b6f73;
+  --text-muted: #8e9196;
+
+  --border: rgba(122, 96, 88, 0.18);
+  --border-light: rgba(122, 96, 88, 0.1);
+  --shadow: rgba(59, 61, 63, 0.09);
+
+  --accent: #537d96;
+  --accent-hover: #456a80;
+  --accent-light: rgba(83, 125, 150, 0.08);
+  --accent-rgb: 83, 125, 150;
+
+  --danger: #8b3a3a;
+  --danger-rgb: 139, 58, 58;
+
+  --overlay-subtle: rgba(0, 0, 0, 0.03);
+  --overlay-light: rgba(0, 0, 0, 0.05);
+  --overlay-medium: rgba(0, 0, 0, 0.08);
+  --overlay-strong: rgba(0, 0, 0, 0.15);
+}

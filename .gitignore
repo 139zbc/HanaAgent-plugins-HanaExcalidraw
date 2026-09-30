@@ -1,0 +1,29 @@
+# 依赖与构建产物：仓库只留源码。
+# 两者都不进版本库，但都会进打包产物（打包器不排除任何文件）。
+node_modules/
+ui/
+
+# HanaAgent SDK：不在 npm 上，由 fetch-hana-sdk.mjs 从本机 HanaAgent 取到这里。
+# 不入库——用这个插件的人本来就有 HanaAgent，入库反而是替别人存一份 2.4 MB 二进制。
+sdk/
+
+# 打包产物本身
+dist-extensions/
+*.zip
+*.entry.json
+
+# 本地临时件 / 备份
+.tmp-scene.json
+.backup-global-*.json
+*.log
+npm-debug.log*
+
+# 调试探针（开发期一次性产物，不入包也不入库）
+probe/
+.probe/
+
+# 编辑器与系统
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

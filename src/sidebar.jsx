@@ -7,10 +7,10 @@ import {
   createBoard,
   deleteBoard,
   loadBoardSummary,
-  moveBoard,
   moveBoardTo,
   readActiveBoard,
   renameBoard,
+  revealBoard,
   sendBoardCommand,
   subscribeBoardPulse,
   subscribeBoardStatus,
@@ -43,7 +43,7 @@ import "./sidebar.css";
  *
  * The two documents share no JavaScript objects, so the only channel is App
  * storage. Reads are unwrapped: `storage.global.get` answers `{key, value}`, and
- * a field read straight off that envelope is `undefined` every time (PLAN.md
+ * a field read straight off that envelope is `undefined` every time (开发记录
  * R57 — this exact trap shipped once already).
  */
 
@@ -417,6 +417,27 @@ function Sidebar() {
 
   /* ---- file operations ------------------------------------------------ */
 
+  /**
+   * A toast, with a way to be seen when there is no toast.
+   *
+   * `hana.toast` is a host capability, and the failure mode for calling it wrong
+   * is the worst kind: a TypeError before anything is sent, so the panel simply
+   * did nothing. If it is missing the message still has to land somewhere, and
+   * the panel already knows how to print one.
+   */
+  const toast = useCallback(async (message, type) => {
+    try {
+      if (typeof hana?.toast?.show === "function") {
+        await hana.toast.show({ message, type });
+        return true;
+      }
+    } catch {
+      /* fall through to the panel */
+    }
+    setError(message);
+    return false;
+  }, []);
+
   const run = useCallback(
     async (label, fn) => {
       setBusy(true);
@@ -491,11 +512,35 @@ function Sidebar() {
     [boards, activeId, run],
   );
 
-  const reorder = useCallback(
-    (boardId, direction) => {
-      void run(direction === "up" ? "上移" : "下移", () => moveBoard(boardId, direction));
+  const reveal = useCallback(
+    (boardId) => {
+      setMenu(null);
+      // The backend opens it, and the host renders the toast.
+      //
+      // The page used to call `hana.external.open` itself, which reads like the
+      // right call — a host capability, taking a URL, exactly this job. It is
+      // granted per-ledger with no manifest fallback though, so an app cannot
+      // obtain it by declaring it, and the host answers `Plugin UI capability
+      // "external.open" has not been granted`. `app/process.spawn` *is* granted
+      // by a manifest line, so that path asks once instead of per click.
+      //
+      // Every step reports rather than assumes. A wrong host capability throws a
+      // TypeError before anything is sent, and that looks exactly like doing
+      // nothing — which is how two versions of this failed without a log line.
+      void (async () => {
+        try {
+          const res = await revealBoard(boardId);
+          await toast(res?.ok ? "已在文件管理器中打开" : "没能打开文件管理器", res?.ok ? "success" : "error");
+          track("board:revealed", { boardId, opened: Boolean(res?.ok), detail: res?.detail });
+          if (!res?.ok) setError(`${res?.error || "没能打开文件管理器"}${res?.dir ? `\n${res.dir}` : ""}`);
+        } catch (err) {
+          const message = String(err?.message || err);
+          await toast(`打开失败：${message}`, "error");
+          setError(`打开失败：${message}`);
+        }
+      })();
     },
-    [run],
+    [],
   );
 
   /* ---- drag to reorder ------------------------------------------------ */
@@ -799,34 +844,23 @@ function Sidebar() {
     (event, board) => {
       event.preventDefault();
       event.stopPropagation();
-      const at = boards.findIndex((b) => b.id === board.id);
       menuAtRef.current = { x: event.clientX, y: event.clientY };
       setMenu({
         boardId: board.id,
         at: menuAtRef.current,
         items: [
-          // Opening is a left-click, and the row is right there. A menu item
-          // that says so — disabled, because there is nothing to choose — beats
-          // leaving the user wondering whether right-click is a different verb.
-          { id: "open", label: board.id === activeId ? "已经在画布上" : "在画布上打开", action: () => openBoard(board.id) },
           {
             id: "rename",
             label: "重命名",
             action: () => setComposer({ kind: "rename", boardId: board.id, value: board.title || board.id }),
           },
-          { id: "up", label: "上移", disabled: at <= 0, action: () => reorder(board.id, "up") },
-          {
-            id: "down",
-            label: "下移",
-            disabled: at < 0 || at >= boards.length - 1,
-            action: () => reorder(board.id, "down"),
-          },
+          { id: "reveal", label: "打开文件所在位置", action: () => reveal(board.id) },
           { id: "divider", divider: true },
           { id: "delete", label: "删除", tone: "danger", action: () => confirmDelete(board) },
         ],
       });
     },
-    [boards, activeId, openBoard, reorder, confirmDelete],
+    [reveal, confirmDelete],
   );
 
   useEffect(() => {
@@ -947,7 +981,7 @@ function Sidebar() {
               data-menu-open={menu?.boardId === row.id || undefined}
               data-dragged={draggingId === row.id || undefined}
               disabled={busy}
-              title={`${row.title} · ${row.shapes} · 拖左侧手柄排序，右键可以重命名、删除`}
+              title={`${row.title} · ${row.shapes} · 拖左侧手柄排序，右键可以重命名、找文件、删除`}
               onClick={() => {
                 // A drag that just ended produces a click too. Without this the
                 // row both reorders and switches, and the user watches the canvas

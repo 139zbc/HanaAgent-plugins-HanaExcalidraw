@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
 import ExcalidrawBoard from "./ExcalidrawBoard.jsx";
-import { readActiveBoard } from "./boardClient.js";
+import { readPreviewBoard } from "./boardClient.js";
 
 /**
  * The in-chat preview entry.
@@ -12,16 +12,20 @@ import { readActiveBoard } from "./boardClient.js";
  * Two constraints shape it:
  *
  *   - **The host passes nothing to this iframe.** A messageRenderer card gets no
- *     payload and no query string, so the board to show cannot come from the
- *     message. It comes from `ui:activeBoard` instead — the same key the main card
- *     uses, which is the board the agent just drew on, so the preview shows what
- *     was shared.
+ *     payload and no query string, and the card's `route` has to keep matching
+ *     the manifest's declared `route` exactly, so neither of the two places a
+ *     message could normally travel is available. The board id comes from App
+ *     storage instead: `ui:sharedBoard` (written by `board_share`) and
+ *     `ui:activeBoard` (written when the user picks a board), newest first.
+ *     Reading only the second one showed the board the *user* was on, which is
+ *     the right answer only when the agent drew on that same board — a card
+ *     titled with one board and painting another, silently.
  *   - **It must be read-only.** Rendering the normal card would offer a toolbar,
  *     a dock and a function panel inside a chat stream, and edits made there
  *     would have nowhere sensible to go. `readOnly` turns all of that off.
  *
  * The board id is resolved *before* mounting, because `ExcalidrawBoard` reads it
- * once during its first render (PLAN.md R13) and a late-arriving id would paint
+ * once during its first render (开发记录 R13) and a late-arriving id would paint
  * the wrong board first.
  */
 async function main() {
@@ -31,11 +35,11 @@ async function main() {
 
   let boardId = "main";
   try {
-    // `readActiveBoard` returns null when nothing has been shared yet; falling
-    // back to `main` keeps the card from rendering an error instead of a board.
-    boardId = (await readActiveBoard()) || "main";
+    // Falls back to `main` when nothing has been shared or opened yet, so the
+    // card renders a board rather than an error.
+    boardId = (await readPreviewBoard()) || "main";
   } catch (err) {
-    console.warn("[excalidraw] preview could not read the active board:", err?.message || err);
+    console.warn("[excalidraw] preview could not resolve its board:", err?.message || err);
   }
 
   createRoot(root).render(<ExcalidrawBoard boardId={boardId} readOnly />);

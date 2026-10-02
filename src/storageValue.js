@@ -15,7 +15,7 @@
  * time, and `undefined` reads as a legitimate "nothing stored yet". So the code
  * that depended on it did not fail — it quietly became "always the default",
  * which is indistinguishable from correct behaviour until you look for the
- * thing it was supposed to remember. (PLAN.md R57.)
+ * thing it was supposed to remember. (开发记录 R57.)
  *
  * The trap is that the **server-side** `sdk.storage.global.get` really does
  * return the bare value: its declared type is `get(key, fallback?) => unknown`,

@@ -1,5 +1,6 @@
 import { hana } from "@hana/plugin-sdk";
 import { unwrapStored } from "./storageValue.js";
+import { ACTIVE_BOARD_KEY, SHARED_BOARD_KEY } from "../lib/storageKeys.js";
 
 /**
  * Board API, called from the card page.
@@ -92,16 +93,23 @@ export async function renameBoard(boardId, title) {
 }
 
 /**
- * Move a file one position in the stored order.
+ * Where a board's file lives — and, unless asked not to, opens it.
  *
- * Positions are the backend's business: it holds the authoritative order, so the
- * page only says which way to move and which file.
+ * The opening is the backend's. `hana.external.open` looks like the right
+ * capability for this, and it is, but the host grants it through a ledger with
+ * no manifest fallback (`ledger.query(...)?.decision === "allowed"`), so an app
+ * cannot obtain it by declaring it — the host answers `Plugin UI capability
+ * "external.open" has not been granted`. `app/process.spawn` *is* granted by a
+ * manifest line.
+ *
+ * Pass `{ launch: false }` for the locations without the side effect, which is
+ * how a test can check this route without opening a window on someone's desktop.
  */
-export async function moveBoard(boardId, direction) {
-  return request(`/boards/${encodeURIComponent(boardId)}/move`, {
+export async function revealBoard(boardId, options = {}) {
+  return request(`/boards/${encodeURIComponent(boardId)}/reveal`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ direction }),
+    body: JSON.stringify({ launch: options.launch !== false }),
   });
 }
 
@@ -262,7 +270,23 @@ async function writeToAppFolder(boardId, format, dataUrl) {
  * page, so it cannot dispatch an event into the canvas document. It writes here
  * and the card picks it up.
  */
-export const ACTIVE_KEY = "ui:activeBoard";
+export const ACTIVE_KEY = ACTIVE_BOARD_KEY;
+
+/**
+ * Which board was most recently shared into the conversation.
+ *
+ * Written by `board_share`. It exists because the host hands a preview card no
+ * payload and no query string, and the route must stay query-free to keep
+ * matching the manifest's declared `route` exactly — so there is nowhere in the
+ * card itself to say *which* board this is.
+ *
+ * `ui:activeBoard` was carrying that job, and it answers a different question:
+ * it is "what the user happens to be looking at". Those coincide only when the
+ * agent happens to have just drawn on the board the user was already on, which
+ * is the one case where nothing is wrong. Share any other board and the card is
+ * titled with the shared board's name while painting a different one.
+ */
+export const SHARED_KEY = SHARED_BOARD_KEY;
 
 export async function switchBoard(boardId) {
   try {
@@ -298,10 +322,45 @@ export async function readActiveBoard() {
     // The unwrap is load-bearing. Without it this reads `undefined` off the
     // host's `{key, value}` envelope on every call, so the function returned
     // null every time — and the "remember the board you were on" behaviour it
-    // exists for silently did nothing. See storageValue.js and PLAN.md R57.
+    // exists for silently did nothing. See storageValue.js and 开发记录 R57.
     const value = unwrapStored(await hana.storage.global.get(ACTIVE_KEY));
     const id = typeof value === "string" ? value : value?.boardId;
     return typeof id === "string" && id ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Which board a preview card should paint.
+ *
+ * Two keys answer it and the newer timestamp wins, rather than one key being
+ * declared the winner. `ui:sharedBoard` is written when the agent shares;
+ * `ui:activeBoard` is written whenever the user picks a board by hand. Asking
+ * "which happened last" needs no tie-break rule and no window: sharing a board
+ * and then switching away is a legitimate sequence that should show the shared
+ * one, and switching to a board and then having the agent share something else
+ * should show the new one. Either way the later statement is the one the user
+ * was last told to look at.
+ *
+ * Both are best-effort: a card with neither shows `main`, which is the board the
+ * app opens on.
+ */
+export async function readPreviewBoard() {
+  const pick = (raw) => {
+    const value = unwrapStored(raw);
+    const id = typeof value === "string" ? value : value?.boardId;
+    return typeof id === "string" && id ? { id, at: Number(value?.at) || 0 } : null;
+  };
+  try {
+    const [shared, active] = await Promise.all([
+      hana.storage.global.get(SHARED_KEY),
+      hana.storage.global.get(ACTIVE_KEY),
+    ]);
+    const s = pick(shared);
+    const a = pick(active);
+    if (s && a) return s.at >= a.at ? s.id : a.id;
+    return (s || a)?.id ?? null;
   } catch {
     return null;
   }
@@ -333,18 +392,6 @@ export async function saveBoardScene(scene, boardId = DEFAULT_BOARD_ID, updatedB
     throw err;
   }
   return data;
-}
-
-/**
- * React to a board being changed by anyone else — the agent, another window,
- * another surface. The host broadcasts this on its own app_event channel, so
- * it crosses every door: backend tool, another card, another surface.
- */
-export function subscribeBoard(boardId, callback) {
-  const key = `board:${boardId}`;
-  return hana.storage.global.onChanged((keys) => {
-    if (Array.isArray(keys) && keys.includes(key)) callback();
-  });
 }
 
 /**

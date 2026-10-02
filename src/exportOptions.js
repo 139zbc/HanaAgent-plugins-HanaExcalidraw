@@ -36,7 +36,7 @@ export function exportAppState(appState) {
  * Files to hand the exporter.
  *
  * `ExportOpts.files` is required (not optional) and is the binary map for `image`
- * elements. This app excludes `image` elements by design (PLAN §1: they need a
+ * elements. This app excludes `image` elements by design (开发记录 §1: they need a
  * separate `api.addFiles()` step and the 0.18.1 `SceneData` has no `files` field),
  * so the map is always empty — but it must be passed, not omitted.
  */

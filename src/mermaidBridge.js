@@ -22,7 +22,7 @@ import { RESULT_KEY, REQUEST_KEY, DEFAULT_TIMEOUT_MS } from "../lib/mermaid.js";
  * 3. **Storage is read through `hostStorage`.** The host answers reads with a
  *    `{ key, value }` wrapper, so `request?.token` off the raw result is `undefined`
  *    every time and the bridge would do nothing, silently and forever. That is
- *    PLAN.md R57, and the unwrapping lives in `hostStorage` so this file never has
+ *    开发记录 R57, and the unwrapping lives in `hostStorage` so this file never has
  *    to think about it.
  *
  * The request carries a token rather than relying on a timestamp. The panel's
@@ -100,8 +100,11 @@ export async function runMermaidConversion({ boardId, mermaid, mode = "append", 
     // Aim to start just below whatever is already there. Without existing content
     // the diagram keeps Mermaid's own origin, so a first draw lands where it was
     // laid out.
-    const dx = bounds ? bounds.minX - 0 : 0;
-    const dy = bounds ? bounds.maxY + APPEND_GAP - 0 : 0;
+    // Both derived from the live bounds. The `- 0` these used to carry was an
+    // edit remnant from when the offsets were computed against something else;
+    // the values are simply the bounds.
+    const dx = bounds ? bounds.minX : 0;
+    const dy = bounds ? bounds.maxY + APPEND_GAP : 0;
     elements = [...existing, ...translate(produced, dx, dy)];
   }
 
@@ -119,7 +122,7 @@ export async function runMermaidConversion({ boardId, mermaid, mode = "append", 
  *
  * The card-side `storage.get` answers the host's `{ key, value }` wrapper, not the
  * value; reading a field off it yields `undefined` every time, which reads as
- * "nothing stored yet" and so fails silently (PLAN.md R57, and note that the
+ * "nothing stored yet" and so fails silently (开发记录 R57, and note that the
  * *server-side* call returns the bare value — the same method name, two shapes).
  *
  * Unwrapping happens **here, at the one boundary**, rather than at each read. Then

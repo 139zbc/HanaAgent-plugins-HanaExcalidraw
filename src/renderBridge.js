@@ -58,7 +58,7 @@ const CLAIM_KEY = "ui:renderClaim";
  * A request older than the tool's own timeout has nobody waiting for it: the tool
  * already gave up (and, since 0.17.1, deleted the key on the way out). Whatever is
  * left over is an orphan, and the likeliest way to make one is a host restart in the
- * middle of the call, which is exactly how this was found (PLAN.md R74): a 17:24
+ * middle of the call, which is exactly how this was found (开发记录 R74): a 17:24
  * request was replayed by the page at 17:28 and rendered a board nobody had asked
  * about for four minutes.
  */
@@ -150,7 +150,7 @@ export async function runRender({ boardId = null, scale = 1, ctx }) {
  * `storage` must be the *adapting* one (`hostStorage`), because the host answers
  * reads with a `{ key, value }` wrapper: reading `request?.token` off it is
  * `undefined` every time, and the bridge then does nothing, silently, forever
- * (PLAN.md R57).
+ * (开发记录 R57).
  */
 export function installRenderBridge({
   enabled,

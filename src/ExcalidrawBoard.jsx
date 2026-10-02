@@ -154,7 +154,7 @@ export default function ExcalidrawBoard({ boardId = DEFAULT_BOARD_ID, readOnly =
    * action had: `setStatus` strings ("saved r191", "export failed", "file op
    * failed") were technical diagnostics, and the only surface painting them was
    * a step-0 probe over the canvas. Four carefully separated export outcomes
-   * (PLAN.md R41) went there and reached nobody.
+   * (开发记录 R41) went there and reached nobody.
    */
   const [notice, setNotice] = useState(null);
 
@@ -164,7 +164,18 @@ export default function ExcalidrawBoard({ boardId = DEFAULT_BOARD_ID, readOnly =
   const echoTimer = useRef(0);
   const echoRef = useRef(false);
   const pendingScene = useRef(null);
+  const retryTimer = useRef(0);
+  const retryCount = useRef(0);
   const myRev = useRef(0);
+  /**
+   * `flush`, forwarded.
+   *
+   * The retry scheduler below has to call `flush`, and `flush` is declared after
+   * it — a direct reference would be the temporal-dead-zone shape of R23, and a
+   * dependency array would make the two callbacks chase each other. A ref
+   * assigned once per render breaks the cycle without either moving.
+   */
+  const flushRef = useRef(null);
   /**
    * The board whose scene is actually on the canvas.
    *
@@ -178,6 +189,19 @@ export default function ExcalidrawBoard({ boardId = DEFAULT_BOARD_ID, readOnly =
    * A scene captured for one board can never be written to another.
    */
   const loadedBoardId = useRef(null);
+  /**
+   * The title of the board on the canvas, for the save dialog's suggested name.
+   *
+   * Declared up here with the other ownership refs rather than next to the
+   * export code that reads it: it is written by `pullRemote` and `applyBoard`,
+   * both of which are declared above that point, and a ref touched from a
+   * closure below its declaration is the same temporal-dead-zone shape as R23.
+   *
+   * It has to be a ref, not state. Nothing on screen depends on the title — it
+   * only ever reaches a filename — so a re-render per rename would be cost
+   * without a reader.
+   */
+  const currentTitleRef = useRef("");
   /** Monotonic token so a slow board load cannot paint over a newer one. */
   const loadToken = useRef(0);
   // Excalidraw reflows text once its webfonts land, which fires onChange without
@@ -187,7 +211,7 @@ export default function ExcalidrawBoard({ boardId = DEFAULT_BOARD_ID, readOnly =
 
   /**
    * `initialData` is read exactly once, during Excalidraw's own async
-   * `initializeScene` (PLAN.md R13). It used to resolve the *prop* board — always
+   * `initializeScene` (开发记录 R13). It used to resolve the *prop* board — always
    * `main` — and leave the real active board to a later `updateScene`. Those two
    * async paths raced, and when `initializeScene` won, the canvas kept `main`
    * while the app believed a different board was active.
@@ -303,7 +327,7 @@ export default function ExcalidrawBoard({ boardId = DEFAULT_BOARD_ID, readOnly =
     const elements = restoreElements(scene.elements ?? [], null, { repairBindings: true });
     const appState = restoreAppState(scene.appState ?? {}, null);
     // updateScene re-enters through onChange; swallow exactly that echo so the
-    // autosave does not write the agent's own scene straight back (PLAN.md R10).
+    // autosave does not write the agent's own scene straight back (开发记录 R10).
     echoRef.current = true;
     clearTimeout(echoTimer.current);
     echoTimer.current = setTimeout(() => {
@@ -342,7 +366,7 @@ export default function ExcalidrawBoard({ boardId = DEFAULT_BOARD_ID, readOnly =
       // worked.
       setTimeout(() => {
         const applied = apiRef.current?.getAppState?.()?.activeTool?.type ?? null;
-      probePreview({ outcome: "hand-tool", requested: "hand", activeTool: applied });
+        probePreview({ outcome: "hand-tool", requested: "hand", activeTool: applied });
       }, 120);
     }
     // `reconcileTheme` closes over the current theme, so it belongs here: without
@@ -481,6 +505,9 @@ export default function ExcalidrawBoard({ boardId = DEFAULT_BOARD_ID, readOnly =
         if (!board) return;
         if (!opts.force && board.rev === myRev.current) return;
         myRev.current = board.rev;
+        // Read once per board that lands, and only here: these two are the only
+        // moments a board becomes the one on the canvas.
+        currentTitleRef.current = board.title || target;
         applyRemoteScene(board.scene);
         setCount(board.scene.elements.length);
         // Frame the board only when it is *arriving*: first open, or the user
@@ -512,7 +539,7 @@ export default function ExcalidrawBoard({ boardId = DEFAULT_BOARD_ID, readOnly =
    *
    *   - a *second* whiteboard window saved. Board content lives in files now,
    *     and the signal was only sent for the agent's writes, precisely so a page
-   *     would not repaint itself mid-stroke (PLAN.md D7). That left two open
+   *     would not repaint itself mid-stroke (开发记录 D7). That left two open
    *     windows silently diverging. The backend now signals every write, and
    *     this page is immune to its own signal because `pullRemote` returns early
    *     when the revision has not moved.
@@ -675,6 +702,32 @@ export default function ExcalidrawBoard({ boardId = DEFAULT_BOARD_ID, readOnly =
     [activeId, exporting, setNotice],
   );
 
+  /**
+   * Try a failed save again, a few times, then stop and say so.
+   *
+   * The draft is still sitting on the canvas and Excalidraw will not fire
+   * another `onChange` until the user draws again, so without this a transient
+   * failure costs those strokes permanently — and silently, since the only
+   * status line that mentioned it (`setStatus`) stopped being drawn anywhere
+   * when the dock went away.
+   */
+  const scheduleRetry = useCallback(() => {
+    clearTimeout(retryTimer.current);
+    if (retryCount.current >= 3) {
+      setNotice({
+        label: "自动保存",
+        value: "没存上",
+        delta: "内容还在画布上，但你得再落一笔才会重试",
+        tone: "danger",
+      });
+      return;
+    }
+    retryCount.current += 1;
+    retryTimer.current = setTimeout(() => {
+      void flushRef.current?.();
+    }, 2500);
+  }, []);
+
   const flush = useCallback(async () => {
     const draft = pendingScene.current;
     if (!draft) return;
@@ -692,6 +745,7 @@ export default function ExcalidrawBoard({ boardId = DEFAULT_BOARD_ID, readOnly =
     try {
       const { rev } = await saveBoardScene(scene, draft.boardId, "user", myRev.current);
       myRev.current = rev;
+      retryCount.current = 0;
       setStatus(`saved r${rev}`);
       track("board:saved", { rev, boardId: draft.boardId, elements: scene.elements.length });
     } catch (err) {
@@ -704,12 +758,19 @@ export default function ExcalidrawBoard({ boardId = DEFAULT_BOARD_ID, readOnly =
         setConflictDraft({ ...scene, boardId: draft.boardId });
         track("board:conflict", { baseRev: myRev.current, mine: scene.elements.length });
       } else {
+        // Put the draft back. It is the only copy of what the user just drew,
+        // and nothing else will re-offer it: the canvas sits there looking
+        // saved, and the next `onChange` is however long until they draw again.
+        pendingScene.current = draft;
         setStatus("save failed");
         track("board:save-error", { message: String(err?.message || err) });
         console.warn("[excalidraw] save failed:", err);
+        scheduleRetry();
       }
     }
-  }, []);
+  }, [scheduleRetry]);
+
+  flushRef.current = flush;
 
   /** Conflict resolution: take the other writer's version. */
   const takeRemote = useCallback(async () => {
@@ -731,11 +792,42 @@ export default function ExcalidrawBoard({ boardId = DEFAULT_BOARD_ID, readOnly =
       track("board:conflict-abandoned", { boardId: draft.boardId, current: loadedBoardId.current });
       return;
     }
+    // And if the board is simply gone — deleted in another window, or by the
+    // agent — "keep mine" is answering a question about a file that no longer
+    // exists. Writing anyway would recreate it under the user's feet, and they
+    // would be told it saved onto something that was not there.
+    const stillThere = await loadBoard(draft.boardId).catch(() => null);
+    if (!stillThere) {
+      setStatus("画板已被删除");
+      setNotice({
+        label: "保存",
+        value: "画板已被删除",
+        delta: "内容还在画布上，没有写回",
+        tone: "danger",
+      });
+      track("board:conflict-vanished", { boardId: draft.boardId });
+      return;
+    }
     const scene = { elements: draft.elements, appState: draft.appState };
     setStatus("saving");
     try {
-      const { rev } = await saveBoardScene(scene, draft.boardId, "user", null);
+      const { rev, created } = await saveBoardScene(scene, draft.boardId, "user", null);
       myRev.current = rev;
+      // Belt and braces: the check above closes almost the whole window, but a
+      // delete landing between the read and the write would still create a file,
+      // and the response is the only place that knows it happened.
+      if (created) {
+        setStatus("画板已被删除");
+        setNotice({
+          label: "保存",
+          value: "画板已被删除",
+          delta: "内容还在画布上，没有写回",
+          tone: "danger",
+        });
+        track("board:conflict-vanished", { boardId: draft.boardId, afterWrite: true });
+        return;
+      }
+      retryCount.current = 0;
       setStatus(`saved r${rev}`);
       track("board:conflict-forced", { rev, elements: scene.elements.length });
     } catch (err) {
@@ -764,6 +856,10 @@ export default function ExcalidrawBoard({ boardId = DEFAULT_BOARD_ID, readOnly =
       // and flush can never reassign it. See `loadedBoardId`.
       if (!loadedBoardId.current) return; // canvas has no owner yet: not saveable
       pendingScene.current = { elements, appState, boardId: loadedBoardId.current };
+      // A new stroke re-arms the retry budget: whatever was pending is being
+      // superseded by something that definitely has a save attempt in front of
+      // it now.
+      retryCount.current = 0;
       clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(flush, SAVE_DEBOUNCE_MS);
     },
@@ -806,11 +902,16 @@ export default function ExcalidrawBoard({ boardId = DEFAULT_BOARD_ID, readOnly =
           return;
         }
         clearTimeout(saveTimer.current);
+        clearTimeout(retryTimer.current);
+        // A different board is a different save history; inheriting the other
+        // one's retry count would silence this board's retries for no reason.
+        retryCount.current = 0;
         pendingScene.current = null;
         setConflictDraft(null);
         // Claim the canvas only now that there is a scene to put on it.
         loadedBoardId.current = next;
         myRev.current = board.rev;
+        currentTitleRef.current = board.title || next;
         setActiveId(next);
         applyRemoteScene(board.scene);
         setCount(board.scene.elements.length);
@@ -830,7 +931,6 @@ export default function ExcalidrawBoard({ boardId = DEFAULT_BOARD_ID, readOnly =
 
   const activeIdRef = useRef(activeId);
   activeIdRef.current = activeId;
-  const currentTitleRef = useRef("");
 
   /**
    * Hand the keyboard back to the canvas.
@@ -960,6 +1060,22 @@ export default function ExcalidrawBoard({ boardId = DEFAULT_BOARD_ID, readOnly =
   useEffect(() => {
     if (!host) return;
     return subscribeBoardPulse((pulse) => {
+      // A deletion is a different event from an edit, and it needs different
+      // handling: there is nothing to pull, so the generic path would find no
+      // board, return quietly, and leave the user drawing on a canvas whose
+      // file no longer exists — the next stroke would then write it back.
+      if (pulse?.deleted) {
+        if (pulse.boardId === loadedBoardId.current) {
+          setNotice({
+            label: "画板",
+            value: "已被删除",
+            delta: "画布上的内容还在，但没有存到文件里",
+            tone: "danger",
+          });
+          track("board:deleted-elsewhere", { boardId: pulse.boardId });
+        }
+        return;
+      }
       // Skip our own write without pulling. The signal carries the revision it
       // belongs to, so the comparison costs one small storage read — while
       // `pullRemote` would fetch the entire scene only to discover the revision
@@ -971,6 +1087,25 @@ export default function ExcalidrawBoard({ boardId = DEFAULT_BOARD_ID, readOnly =
       pullRemote("pulse");
     });
   }, [host, pullRemote]);
+
+  /**
+   * Timer cleanup, registered unconditionally.
+   *
+   * The effect that also owns these returns early when the host handshake has
+   * not completed, so on a page that never completes it — a plain dev server, an
+   * exported card — the cleanup is never installed and a save scheduled just
+   * before unmount still fires at a component that is gone. Timers outlive the
+   * thing that scheduled them, so the registration cannot depend on a runtime
+   * condition.
+   */
+  useEffect(() => {
+    return () => {
+      clearTimeout(saveTimer.current);
+      clearTimeout(echoTimer.current);
+      clearTimeout(themeCheckTimer.current);
+      clearTimeout(retryTimer.current);
+    };
+  }, []);
 
   /**
    * File operations live in the panel now.
@@ -1066,7 +1201,15 @@ export default function ExcalidrawBoard({ boardId = DEFAULT_BOARD_ID, readOnly =
         } else {
           await pullRemote("mermaid", { force: true });
         }
-        setNotice(`已用 Mermaid 画入 ${outcome.count} 个图元`);
+        // The same object shape every other notice uses. A bare string here
+        // renders as a panel row with nothing in it: the sidebar reads
+        // `notice.label` / `notice.value`, and a string has neither.
+        setNotice({
+          label: "Mermaid",
+          value: `已画入 ${outcome.count} 个图元`,
+          delta: "已生成",
+          tone: "success",
+        });
       },
       track,
       probe: (payload) => probePreview(payload, "ui:mermaidProbe"),

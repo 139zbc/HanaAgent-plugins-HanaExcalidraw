@@ -4,7 +4,7 @@
 
  - 仓库：<https://github.com/139zbc/HanaAgent-plugins-HanaExcalidraw>
  - 宿主项目 HanaAgent：<https://github.com/liliMozi/openhanako>
- - App id `hana-excalidraw` ｜ 当前版本 `1.0.0` ｜ 最低宿主版本 `0.1028.0` ｜ Manifest `manifestVersion: 2`
+ - App id `hana-excalidraw` ｜ 当前版本 `1.1.0` ｜ 最低宿主版本 `0.1028.0` ｜ Manifest `manifestVersion: 2`
 
 
 ---
@@ -96,7 +96,7 @@ Agent 画的时候是看不见图的。两个工具把这件事补上：
 board_draw_mermaid  →  board_check（便宜：结构对不对）  →  board_render（贵：好不好看）
 ```
 
-`board_render` 有一个好用的性质：**任何打开的页面都能渲染任意一块画板**——正好是白板上开着的那张就取实时画布，否则直接读保存的文件。所以 Agent 想自己闭环、不打断你，可以先 `board_share` 开一张只读预览卡，再用它渲染。整条链路你不需要动手：切画板、开窗口、点保存，一次都不用。
+`board_render` 要问一个开着的页面要画布（后端没有画布），所以它能渲染哪些板，**取决于哪种页面开着**：白板页面只持有它当前打开的那一块，**聊天里的只读预览卡可以读任意板**。所以 Agent 想自己闭环、不打断你，可以先 `board_share` 开一张只读预览卡，再用它渲染。整条链路你不需要动手：切画板、开窗口、点保存，一次都不用。
 
 ### 随包 skill
 
@@ -114,13 +114,13 @@ board_draw_mermaid  →  board_check（便宜：结构对不对）  →  board_r
 
 ### 方式 A：装打包好的包（普通用户）
 
-<https://github.com/139zbc/HanaAgent-plugins-HanaExcalidraw/releases>
+包在仓库的 [Releases](<https://github.com/139zbc/HanaAgent-plugins-HanaExcalidraw/releases>) 里，取最新的那个。文件命名规则：
 ```
-app-hana-excalidraw-1.0.0.zip        111,548,541 字节
-app-hana-excalidraw-1.0.0.entry.json 宿主安装用的扩展索引条目
+app-hana-excalidraw-<version>.zip        应用包
+app-hana-excalidraw-<version>.entry.json 宿主安装用的扩展索引条目
 ```
 
-1. 下载 `app-hana-excalidraw-<version>.zip`。
+1. 下载 Releases 里最新的 `app-hana-excalidraw-<version>.zip`。
 2. 在 HanaAgent 的扩展 / 应用管理里导入这个包。
 3. 确认权限弹窗（见[配置说明](#配置说明)），然后 reload。
 
@@ -250,7 +250,7 @@ Agent 用的就是下面这些工具。先读：
 
 ### 运行前提
 
-`board_draw_mermaid` 与 `board_render` 需要**至少一个打开的白板页面**（白板卡片或聊天里的只读预览卡）——这两步的排版与栅格化必须由真实浏览器完成。其余工具（读写、列表、删除、结构自检）纯后端，随时可用。
+`board_draw_mermaid` 与 `board_render` 需要**至少一个打开的白板页面**（白板卡片或聊天里的只读预览卡）——这两步的排版与栅格化必须由真实浏览器完成。其中 `board_render` 只能拿到**页面持有的**画板：白板页面持有当前打开的那一块，预览卡持有它自己那块（但预览卡能按 id 读任意板，见上文）。其余工具（读写、列表、删除、结构自检）纯后端，随时可用。
 
 ### 开发期环境变量
 
@@ -298,7 +298,10 @@ Agent 用的就是下面这些工具。先读：
 Mermaid 的排版要在真实浏览器里做，白板卡片得开着。打开白板卡再说一次就行。
 
 **Q：`board_render` 说没有可用的页面。**
-同样需要至少一个打开的白板页面。让 Agent 先 `board_share` 在对话里开一张只读预览卡，它就能自己闭环了——**渲染任意一块画板都不需要你切过去**。
+需要至少一个打开的白板页面。让 Agent 先 `board_share` 在对话里开一张只读预览卡，它就能自己闭环了。
+
+**Q：`board_render` 报「无法读取画板「X」」，可这块板明明在。**
+它只读得到**页面持有**的画板，而白板页面只持有它当前打开的那一块。让 Agent 先 `board_share` 把那块板发一张预览卡，再渲染——**预览卡能读任意板，你不需要切过去**。
 
 **Q：Agent 说「结构完好」，可图就是难看。**
 `board_check` 查的是数据层面的事实：箭头有没有真的吸在框上、标签有没有真的绑在容器里、绑定有没有指向不存在的元素。它数不出「挤」和「被裁」。让 Agent 跑一次 `board_render` 看图。
@@ -352,12 +355,25 @@ Mermaid 的排版要在真实浏览器里做，白板卡片得开着。打开白
 └─ sdk/                             # HanaAgent SDK 的 tgz（不入版本库，见 .gitignore）
 ```
 
-开发期的检查与测试脚本（`scripts/`，53 个）**刻意留在仓库之外**——打包器不排除任何文件，仓库里若带上它们就会跟着进包。跑它们需要在工作台容器里执行。
+开发期的检查与测试脚本（`scripts/`，56 个）**刻意留在仓库之外**——打包器不排除任何文件，仓库里若带上它们就会跟着进包。跑它们需要在工作台容器里执行。
 
 ```bash
 node scripts/check-local-imports.mjs    # 静态检查：用了却没 import 的符号
 node scripts/test-board-files.mjs       # 测试：一板一文件、命名、迁移、降级
 ```
+
+---
+
+## 代码注释里的「开发记录」
+
+源码里大量注释会写“见 **开发记录** R57”“（开发记录 D3）”这类指向。那指的是作者的**《白板-插件开发记录.md》**——一份 214 KB 的工程记录，里面有 92 条风险（`R1`–`R92`）和 28 条架构决策（`D1`–`D28`），逐条记着“这个坑是怎么踩的、为什么这么改”。
+
+它和 `scripts/` 一样**留在工作台容器内、不随仓库分发**，原因是同一个：打包器不排除任何文件，仓库收下它就会跟着进包。所以：
+
+- **如果你在维护这个仓库**，那些引用是有意义的，编号是那份文档的索引。
+- **如果你只是来用它的**，引用读不通是预期的——那些注释解释的是**取舍**（为什么不选另一种做法），而取舍已经在代码里落成了实际行为。想了解某个决定的来龙去脉，代码本身是完整的。
+
+文档里还有两套更早的编号，代码注释里至多各有一处引用：`Q1`–`Q8`（一次性定案，代码里没引用）、`B1`–`B2`（事故编号，`lib/tools.js` 引用了 B2——写 app-data 会被宿主内存副本静默回滚）。
 
 ---
 

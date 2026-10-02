@@ -41,13 +41,13 @@ function copyExcalidrawFonts() {
       if (!existsSync(FONT_SRC)) {
         this.error(
           `missing ${FONT_SRC} — Excalidraw fonts must be self-hosted, otherwise the ` +
-            "canvas falls back to system fonts (see PLAN.md risk R1 / Q2)",
+            "canvas falls back to system fonts (see 开发记录 risk R1 / Q2)",
         );
         return;
       }
       const fonts = collect(FONT_SRC, ".woff2");
       if (!fonts.length) {
-        this.error(`no .woff2 under ${FONT_SRC} (see PLAN.md risk R1 / Q2)`);
+        this.error(`no .woff2 under ${FONT_SRC} (see 开发记录 risk R1 / Q2)`);
         return;
       }
       cpSync(FONT_SRC, FONT_DEST, { recursive: true });

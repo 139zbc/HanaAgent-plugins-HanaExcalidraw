@@ -2,14 +2,15 @@
   "manifestVersion": 2,
   "id": "hana-excalidraw",
   "name": "白板",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "把 Excalidraw 嵌进 HanaAgent：你在画板上直接画，Agent 也能创建和编辑同一块画板。",
   "entry": "index.js",
   "icon": "assets/icon.png",
   "minAppVersion": "0.1028.0",
   "capabilities": [
     "app/tools.expose-to-model",
-    "app/resources.write"
+    "app/resources.write",
+    "app/process.spawn"
   ],
   "contributes": {
     "cards": [
